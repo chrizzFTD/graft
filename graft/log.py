@@ -13,8 +13,9 @@ def new():
 
 @lru_cache(maxsize=1)  # 4 - cache only last operation
 def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> immutables.Map:
-    """Append the given logger entries to the current logger *after* the given index and
-    return wether or not the operation is successful.
+    """Append the given logger entries to the current logger *after* the given index.
+
+    :raises AppendError: If the operation is unsuccessful. This can be one of the following:
 
     Operation will be successful as long as:
 
@@ -66,7 +67,7 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
         return new_entries
 
     with log.mutate() as mm:
-        for i in to_delete:  # offset: exclude after index
+        for i in to_delete:
             # If you get KeyError, go here: https://github.com/MagicStack/immutables/issues/24
             del mm[i]
         mm.update(new_entries)

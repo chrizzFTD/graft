@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import itertools
 import contextlib
+from types import MappingProxyType
 from functools import cached_property
 
 from graft import config, transport
@@ -18,25 +20,22 @@ class Network:
         self._active_ids = self._active_connections.keys()
         self._all_ids = frozenset(config.SERVERS) - {peer_id}
         # have a queue per peer in the network
-        self.outbox = {i: asyncio.Queue() for i in self._all_ids}
+        self.outbox = MappingProxyType({i: asyncio.Queue() for i in self._all_ids})
 
     def send(self, dest: int, msg):
         self.outbox[dest].put_nowait(msg)
 
     async def _send_messages(self):
-        while True:
-            for peer, queue in self.outbox.items():
-                try:
-                    msg = queue.get_nowait()
-                except asyncio.QueueEmpty:  # no message here, come back later
-                    await asyncio.sleep(.01)
-                    continue
+        suppresser = contextlib.suppress(KeyError)
+        for peer, queue in itertools.cycle(self.outbox.items()):
+            try:
+                msg = queue.get_nowait()
+            except asyncio.QueueEmpty:  # no message here, come back later
+                await asyncio.sleep(.1)
+            else:
                 queue.task_done()
-                try:
+                with suppresser:
                     reader, writer = self._active_connections[peer]
-                except KeyError:
-                    logger.debug(f"{peer=} not found. Discarded message: {msg}")
-                else:
                     logger.debug(f"Sending to {peer=} {msg=}")
                     await transport.send(writer, msg)
 

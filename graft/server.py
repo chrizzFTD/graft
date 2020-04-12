@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import contextlib
 from random import randrange
 from types import MappingProxyType
 from functools import partial, cached_property
@@ -11,15 +12,15 @@ logger = logging.getLogger(__name__)
 _MIN_TIMEOUT = 5
 _MAX_TIMEOUT = 10
 
-
-class RaftServer(state.BaseController):
-    MESSAGE_DISPATCHER = MappingProxyType({
+_MESSAGE_DISPATCHER = MappingProxyType({
         model.VoteRequest: state.State.on_election_request,
         model.VoteReply: state.State.on_election_reply,
         model.AppendEntriesRequest: state.State.on_append_entries_request,
         model.AppendEntriesReply: state.State.on_append_entries_reply,
-    })
+})
 
+
+class Server(state.BaseController):
     def __init__(self, peer_id: int):
         super().__init__(peer_id)
         self._net = net.Network(peer_id)
@@ -44,11 +45,8 @@ class RaftServer(state.BaseController):
 
     async def _dispatch_messages(self):
         while msg:= await self._net.recv():
-            try:
-                function = self.MESSAGE_DISPATCHER[type(msg)]
-            except KeyError:
-                logger.warning(f"Don't know how to handle {msg=}")
-            else:
+            with contextlib.suppress(KeyError):
+                function = _MESSAGE_DISPATCHER[type(msg)]
                 await self._add_event(partial(function, self._state, self, msg))
 
     async def _add_event(self, func):
@@ -109,7 +107,7 @@ if __name__ == '__main__':
                 logger.debug(f"Index {i}: {server._state.log[i]}")
 
     async def test(peer_id):
-        server = RaftServer(peer_id)
+        server = Server(peer_id)
         asyncio.create_task(server.start())
         while await asyncio.sleep(.5, result=True):
             if server._state.role == state.Roles.LEADER:
