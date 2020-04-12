@@ -54,18 +54,16 @@ class Network:
             while message:= await transport.recv(reader):
                 await self.inbox.put(message)
 
-        logger.warning(f"Broken peer {connected_peer}. Closing connection.")
+        logger.warning(f"Broken peer {connected_peer}. Closing connection and clearing queue.")
         writer.close()
         await writer.wait_closed()
         ## remove all that was going to be sent
         peer_q = self.outbox[connected_peer]
-        logger.warning(f"Clearing queue: {peer_q}")
         while peer_q.qsize():
             peer_q.get_nowait()
             peer_q.task_done()
 
-        logger.warning(f"Queue {peer_q} empty.")
-        logger.warning(f"Resurrecting connection for {connected_peer}")
+        logger.warning(f"Queue {peer_q} empty. Resurrecting connection for {connected_peer}")
         del self._active_connections[connected_peer]
         awaitable = self._connect(connected_peer)
         asyncio.create_task(awaitable)  # resurrect connection and hope for the best
