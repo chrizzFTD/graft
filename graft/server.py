@@ -1,21 +1,10 @@
-"""
-The goal for this project is to make one server (designated in advance as the "leader")
-replicate its logger on all of the other servers.
-
-It will do this by sending messages through the network and processing their replies.
-You will be able to append new logger entries onto the leader logger and those entries will
-just "magically" appear on all of the followers.
-
-The leader will be able to bring any follower up to date if its logger is missing many entries.
-Also, the leader will be able to determine consensus.
-"""
 import logging
 import asyncio
 from random import randrange
 from types import MappingProxyType
 from functools import partial, cached_property
 
-from graft import net, state, transport, model
+from graft import net, state, model
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +14,8 @@ _MAX_TIMEOUT = 10
 
 class RaftServer(state.BaseController):
     MESSAGE_DISPATCHER = MappingProxyType({
-        model.ElectionRequest: state.State.on_election_request,
-        model.ElectionReply: state.State.on_election_reply,
+        model.VoteRequest: state.State.on_election_request,
+        model.VoteReply: state.State.on_election_reply,
         model.AppendEntriesRequest: state.State.on_append_entries_request,
         model.AppendEntriesReply: state.State.on_append_entries_reply,
     })
@@ -51,7 +40,7 @@ class RaftServer(state.BaseController):
     async def _start_timer(self):
         while timeout:= randrange(_MIN_TIMEOUT*100, _MAX_TIMEOUT*100) / 100:
             await asyncio.sleep(timeout)
-            await self._add_event(partial(state.State.handle_timeout, self._state, self))
+            await self._add_event(partial(state.State.timeout, self._state, self))
 
     async def _dispatch_messages(self):
         while msg:= await self._net.recv():
@@ -59,8 +48,8 @@ class RaftServer(state.BaseController):
                 function = self.MESSAGE_DISPATCHER[type(msg)]
             except KeyError:
                 logger.warning(f"Don't know how to handle {msg=}")
-                continue
-            await self._add_event(partial(function, self._state, self, msg))
+            else:
+                await self._add_event(partial(function, self._state, self, msg))
 
     async def _add_event(self, func):
         await self._machine_events.put(func)
@@ -75,20 +64,32 @@ class RaftServer(state.BaseController):
 
     async def _update_state(self):
         while method:= await self._machine_events.get():
+            self._machine_events.task_done()
             method()
 
     async def _hearbeat(self):
-        while await asyncio.sleep(self.peer_id, result=True):
+        """Leader sends empty requests regularly to prevent election timeouts"""
+        while await asyncio.sleep(self.peer_id/10, result=True):
             await self._add_event(partial(state.State.heartbeat, self._state, self))
 
 
 if __name__ == '__main__':
+    """
+    The goal for this project is to make one server the "leader" and replicate its log on all of the other servers.
+
+    It will do this by sending messages through the network and processing their replies.
+    You will be able to append new logger entries onto the leader logger and those entries will
+    just "magically" appear on all of the followers.
+
+    The leader will be able to bring any follower up to date if its logger is missing many entries.
+    """
     # import uvloop
     # uvloop.install()  # be fast
     import faulthandler
     faulthandler.enable()
 
     import argparse
+    from graft import transport
     transport.logger.setLevel(logging.INFO)  # tmp: debug too verbose for this module
     net.logger.setLevel(logging.INFO)  # tmp: debug too verbose for this module
     state.logger.setLevel(logging.INFO)  # tmp: debug too verbose for this module
@@ -99,16 +100,21 @@ if __name__ == '__main__':
     from datetime import datetime
     node = parsedargs.node
 
+    def _debug_log(server):
+        size = len(server._state.log)
+        logger.info(
+            f"{server.peer_id}, {server._state.role} term: {server._state.term}, {size=}")
+        if size:
+            for i in sorted(filter(lambda x: x>0, {1, size-1, size})):
+                logger.debug(f"Index {i}: {server._state.log[i]}")
+
     async def test(peer_id):
         server = RaftServer(peer_id)
         asyncio.create_task(server.start())
-        while await asyncio.sleep(peer_id, result=True):
-            size = len(server._state.log)
+        while await asyncio.sleep(.5, result=True):
             if server._state.role == state.Roles.LEADER:
                 msg = datetime.now()
                 server._state.append(server, msg)
-                logger.info(f"Leader log size: {size}")
-            else:
-                logger.info(f"Follower log size: {size}")
+            _debug_log(server)
 
     asyncio.run(test(node))

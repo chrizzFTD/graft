@@ -1,8 +1,8 @@
-import typing
 import asyncio
 import logging
 import contextlib
 from functools import cached_property
+
 from graft import config, transport
 
 
@@ -26,12 +26,18 @@ class Network:
     async def _send_messages(self):
         while True:
             for peer, queue in self.outbox.items():
-                msg = await queue.get()
+                try:
+                    msg = queue.get_nowait()
+                except asyncio.QueueEmpty:  # no message here, come back later
+                    await asyncio.sleep(.01)
+                    continue
+                queue.task_done()
                 try:
                     reader, writer = self._active_connections[peer]
                 except KeyError:
-                    logger.warning(f"{peer=} not found. Discarded message: {msg}")
+                    logger.debug(f"{peer=} not found. Discarded message: {msg}")
                 else:
+                    logger.debug(f"Sending to {peer=} {msg=}")
                     await transport.send(writer, msg)
 
     @cached_property
@@ -52,6 +58,14 @@ class Network:
         logger.warning(f"Broken peer {connected_peer}. Closing connection.")
         writer.close()
         await writer.wait_closed()
+        ## remove all that was going to be sent
+        peer_q = self.outbox[connected_peer]
+        logger.warning(f"Clearing queue: {peer_q}")
+        while peer_q.qsize():
+            peer_q.get_nowait()
+            peer_q.task_done()
+
+        logger.warning(f"Queue {peer_q} empty.")
         logger.warning(f"Resurrecting connection for {connected_peer}")
         del self._active_connections[connected_peer]
         awaitable = self._connect(connected_peer)

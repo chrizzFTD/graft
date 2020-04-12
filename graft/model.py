@@ -14,7 +14,7 @@ def validate_types(objects):
             raise TypeError(msg)
 
 
-# logger internals
+# log internals
 @dataclass(frozen=True)
 class Index:
     """Index of a raft logger.
@@ -51,24 +51,24 @@ class _BaseMessage:
 
 @dataclass(frozen=True)
 class AppendEntriesRequest(_BaseMessage):
-    index: int
-    entries: tuple
-    commit_index: int
-    leader_commit: int
+    after_log_index: int  # index of log entry immediately preceding new ones
+    after_log_index_term: int  # index' term entry after which entries will be appended
+    entries: tuple  # log entries to store (empty for heartbeat)
+    leader_commit: int  # leader’s commit index
 
 
 @dataclass(frozen=True)
 class AppendEntriesReply(_BaseMessage):
-    success: bool
-    match_index: int
+    success: bool  # true if follower contained entry matching index and index_term
+    match_index: int  # track what index was requested to be appended on
 
 
 @dataclass(frozen=True)
-class ElectionRequest(_BaseMessage):
-    last_log_index: int
-    last_log_term: int
+class VoteRequest(_BaseMessage):
+    last_log_index: int  # index of candidate’s (sender) last log entry
+    last_log_term: int  # term of candidate’s (sender) last log entry
 
 
 @dataclass(frozen=True)
-class ElectionReply(_BaseMessage):
-    favour: bool
+class VoteReply(_BaseMessage):
+    granted: bool  # true means candidate received vote
