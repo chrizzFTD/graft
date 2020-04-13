@@ -22,7 +22,7 @@ class Roles(Enum):
     FOLLOWER = auto()
     # When no leader is heard, followers become candidates & submit an election request.
     CANDIDATE = auto()
-    #  Handles all client requests & propagates the requests to replicate on followers.
+    # Handles all client requests & propagates the requests to replicate on followers.
     LEADER = auto()
 
 
@@ -311,8 +311,7 @@ class State:
             self.next_index[msg.sender] = msg.match_index + 1
         else:
             # backtrack until we have a match
-            logger.critical(f"Append entries failed for {msg.sender} at index {self.next_index[msg.sender]}")
+            logger.critical(f"Append entries failed for {msg.sender} at index {self.next_index[msg.sender]} from {msg.time}")
             self.next_index[msg.sender] = max(self.next_index[msg.sender] - 1, 0)
             logger.critical(f"Back tracking and retrying now at {self.next_index[msg.sender]}")
             self._leader_append_entries_on_follower(msg.sender, control)
-

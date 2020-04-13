@@ -24,7 +24,6 @@ class Server(state.BaseController):
     def __init__(self, peer_id: int):
         super().__init__(peer_id)
         self._net = net.Network(peer_id)
-        self._retrying_followers = set()
         self._state = state.State()
         self._machine_events = asyncio.Queue()
 
@@ -100,8 +99,7 @@ if __name__ == '__main__':
 
     def _debug_log(server):
         size = len(server._state.log)
-        logger.info(
-            f"{server.peer_id}, {server._state.role} term: {server._state.term}, {size=}")
+        logger.info(f"{server.peer_id}, {server._state.role} term: {server._state.term}, {size=}")
         if size:
             for i in sorted(filter(lambda x: x>0, {1, size-1, size})):
                 logger.debug(f"Index {i}: {server._state.log[i]}")

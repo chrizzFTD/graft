@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from datetime import datetime
+from dataclasses import dataclass, field
 
 
 def _validate_from_annotations(instance):
@@ -43,6 +44,7 @@ class Entry:
 # messages
 @dataclass(frozen=True)
 class _BaseMessage:
+    time: datetime = field(default_factory=datetime.now, init=False)  # for debug mainly
     sender: int  # peer that has sent the message
     term: int
 
