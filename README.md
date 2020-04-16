@@ -18,8 +18,8 @@ For now:
 - After launching each server (on separate shells), they'll start as followers.
 ```bash
 $ python graft/server.py 1
-2020-04-16 19:32:33 ChristianLT graft.net[115] INFO Serving on ('127.0.0.1', 15000)
-2020-04-16 19:32:19 ChristianLT __main__[101] INFO 1, Roles.FOLLOWER term: 0, size=0
+INFO Serving on ('127.0.0.1', 15000)
+INFO 1, Roles.FOLLOWER term: 0, size=0
 ```
 ```bash
 $ python graft/server.py 2
@@ -29,21 +29,21 @@ $ python graft/server.py 3
 ```
 - If they don't hear from a leader after a timeout, a nomination will happen.
 ```bash
-2020-04-16 19:32:26 ChristianLT graft.state[101] WARNING Didnt hear from leader. Calling an election
-2020-04-16 19:32:26 ChristianLT __main__[101] INFO 1, Roles.CANDIDATE term: 1, size=0
+WARNING Didnt hear from leader. Calling an election
+INFO 1, Roles.CANDIDATE term: 1, size=0
 ```
 - Only one leader will be elected, even if multiple followers became candidates.
     - Everyone else will become follower again.
 - Leader will start replicating a log on all followers.
     - Current entries are only timestamps.
 ```bash
-2020-04-16 19:32:27 ChristianLT __main__[101] INFO 1, Roles.LEADER term: 1, size=1
-2020-04-16 19:32:27 ChristianLT __main__[101] INFO 1, Roles.LEADER term: 1, size=2
-2020-04-16 19:32:28 ChristianLT __main__[101] INFO 1, Roles.LEADER term: 1, size=3
-2020-04-16 19:32:28 ChristianLT __main__[101] DEBUG Index 1: Entry(term=1, item=datetime.datetime(2020, 4, 16, 19, 32, 27, 171511))
-2020-04-16 19:32:28 ChristianLT __main__[101] DEBUG Index 2: Entry(term=1, item=datetime.datetime(2020, 4, 16, 19, 32, 27, 674029))
-2020-04-16 19:32:28 ChristianLT __main__[101] DEBUG Index 3: Entry(term=1, item=datetime.datetime(2020, 4, 16, 19, 32, 28, 176315))
-2020-04-16 19:32:28 ChristianLT __main__[101] INFO 1, Roles.LEADER term: 1, size=4
+INFO 1, Roles.LEADER term: 1, size=1
+INFO 1, Roles.LEADER term: 1, size=2
+INFO 1, Roles.LEADER term: 1, size=3
+DEBUG Index 1: Entry(term=1, item=datetime.datetime(2020, 4, 16, 19, 32, 27, 171511))
+DEBUG Index 2: Entry(term=1, item=datetime.datetime(2020, 4, 16, 19, 32, 27, 674029))
+DEBUG Index 3: Entry(term=1, item=datetime.datetime(2020, 4, 16, 19, 32, 28, 176315))
+INFO 1, Roles.LEADER term: 1, size=4
 ```
 - If any server dies (you can `ctrl+c`), when brought back to life it will catchup on the log.
     - If the leader dies, after a bit followers will call an election and cycle will start again.
