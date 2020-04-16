@@ -42,4 +42,7 @@ $ python graft/server.py 3
 2020-04-16 19:32:28 ChristianLT __main__[101] INFO 1, Roles.LEADER term: 1, size=4
 ```
 - If a follower dies (you can `ctrl+c`), it will be reconnected once brought back to life.
-- If leader dies, when spawning back again it will be a follower, cycle will start again.
+- If leader dies, when spawning back again it will be a follower, cycle will start again. A new leader will be elected and this new follower will catch up on the replicated log.
+
+### TODO:
+Everything else.
