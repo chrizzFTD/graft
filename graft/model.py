@@ -18,10 +18,7 @@ def validate_types(objects):
 # log internals
 @dataclass(frozen=True)
 class Index:
-    """Index of a raft logger.
-
-    Index should always be zero or a positive integer.
-    """
+    """Log indices are composed of an `index` and `term` integers"""
     index: int
     term: int
 
@@ -34,7 +31,7 @@ class Index:
 
 @dataclass(frozen=True)
 class Entry:
-    """Entry of a raft logger"""
+    """Entries are composed of a `term` (int) and an `item`, which can be anything"""
     term: int
     item: object
 
@@ -44,6 +41,7 @@ class Entry:
 # messages
 @dataclass(frozen=True)
 class _BaseMessage:
+    """Messages are frozen and include at least creation `time`, `sender` and `term`"""
     time: datetime = field(default_factory=datetime.now, init=False)  # for debug mainly
     sender: int  # peer that has sent the message
     term: int

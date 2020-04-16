@@ -11,49 +11,40 @@ def new():
     return immutables.Map()
 
 
-@lru_cache(maxsize=1)  # 4 - cache only last operation
+@lru_cache(maxsize=1)  # idempotent: calling with same arguments has same result
 def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> immutables.Map:
     """Append the given logger entries to the current logger *after* the given index.
 
-    :raises AppendError: If the operation is unsuccessful. This can be one of the following:
-
-    Operation will be successful as long as:
-
-        1. No gap is there between requested `after` index and size of current logger.
-          - For example, if there are currently 5 entries in the logger, and `after` = Index(9,...).
-        2. There is a logger-continuity condition where every append operation must also take the term number of the previous entry. For example, if appending at index 9, the prev_term value must match the value of logger[8].term. If there is a mismatch, the operation fails (return False).
-
-        3. Special case: Appending logger entries at index 0 always works. That's the start of the logger and there are no prior entries.
-
-        4. append() is "idempotent." Basically, that means that append() can be called repeatedly with the same arguments and the end result is always the same. For example, if you called append() twice in a row to add the same entry at index 10, it just puts the entry at index 10 and does not result in any data duplication or corruption.
-
-        5. Calling append() with an empty list of entries is allowed. In this case, it should report True or False to indicate if it would have been legal to add new entries at the specified position.
-
-        6. If there are already existing entries at the specified logger position and all of the conditions for successfully adding a logger entry are met (see point 2), the existing entries and everything that follows are deleted. The new entries are then added in their place.
+    :raises AppendError: If the operation is unsuccessful. Which can happen if the
+        requested `after` index does not exist in the given `log` (including it's term).
+        Unless index.index is 0. For example:
+            >>> index = model.Index(2, term=4)
+            >>> assert log[2].term == index.term  # index and term match existing entry
+            >>> index = model.Index(0, term=4)  # will work since index it's origin
     """
     to_validate = {log: immutables.Map, after: model.Index}
     to_validate.update({e: model.Entry for e in entries})
     model.validate_types(to_validate)
     after_i = after.index
+    # empty list of entries is ok
     new_entries = immutables.Map(
         {after_i + i: entry for i, entry in enumerate(entries, start=1)}
     )
 
-    # 1
+    # No gap is there between requested `after` index and size of current logger.
     try:
         after_own_entry = log[after_i]
     except KeyError:
-        # 3
+        # Special case: Appending logger entries at index 0 always works
         if after_i != 0:
-            msg = f"Requested index '{after_i}' does not exist on the current logger"
+            msg = f"Requested index '{after_i}' does not exist on the current log"
             raise AppendError(msg)
     else:
-        # 2
+        # after index term should always match own term
         if (actual := after_own_entry.term) != (requested := after.term):
             msg = f"Index {after_i} exists but terms are not equal. {requested=}, {actual=}"
             raise AppendError(msg)
 
-    # 5 empty list of entries is ok. mutate
     max_index = max(log, default=0)
     to_delete = set(range(after_i + 1, max_index + 1))
     if missing:= to_delete.difference(log):
@@ -62,8 +53,8 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
 
     elif set(new_entries) == set(log) or (not log) or (1 in new_entries):
         # if the keys of `new_entries` is exactly the same as the keys on `logger`,
-        # return that already. Do the same if original logger is empty
-        # finally, if the index that we need to replace is all the way back to 1, use new_entries instead
+        # return that already. Do the same if original logger is empty.
+        # finally, if the index that we need to replace is 1, use new_entries instead
         return new_entries
 
     with log.mutate() as mm:
