@@ -14,7 +14,7 @@ If you find this, expect a lot of changes, still unsure about its future.
 ### Starting Raft Network Peers
 This is following the [Raft Consensus Algorithm](https://raft.github.io/)
 For now:
-- 5 servers can start in your local host based on [the config file.](config.py)
+- 5 servers can start in your local host based on [the config file.](graft/config.py)
 - After launching each server (on separate shells), they'll start as followers.
 ```bash
 $ python graft/server.py 1
