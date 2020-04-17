@@ -120,24 +120,20 @@ class State:
             new_entries = (self.log[i] for i in range(start_range, size+1))
         else:
             new_entries = tuple()
-        if size:
-            after_log_index = max(next_follower_index - 1, 0)
-        else:
-            after_log_index = 0
+        after_i = max(next_follower_index - 1, 0) if size else 0
+        after_t = self.log[after_i].term if after_i else self.term
         message = model.AppendEntriesRequest(
             term=self.term,  # leader’s term
             sender=control.peer_id,  # so follower can redirect clients
-            after_log_index=after_log_index,
-            after_log_index_term=self.log[after_log_index].term if after_log_index else self.term,
+            after=model.Index(after_i, after_t),
             entries=tuple(new_entries),
             leader_commit=self.commit_index,
         )
         control.send(peer_id, message)
 
-    def _append(self, after_index, after_term, entries):
-        index = model.Index(after_index, after_term)
+    def _append(self, after, entries):
         try:
-            self.log = log.append(self.log, index, *entries)
+            self.log = log.append(self.log, after, *entries)
         except log.AppendError as exc:
             logger.debug(exc)
             return False
@@ -201,7 +197,7 @@ class State:
         """
         if message.term > self.term:
             self.term = message.term
-            logger.debug("Becoming followe from _handle_base_message")
+            logger.debug("Becoming follower from _handle_base_message")
             self.become_follower()
 
     def on_election_request(self, control: BaseController, msg: model.VoteRequest):
@@ -213,14 +209,12 @@ class State:
         self._handle_base_message(msg)
         # Make sure we've only voted once (or already voted for the sender)
         can_vote_for_sender = not self.voted_for or self.voted_for == msg.sender
-        if self.log or msg.last_log_index:
+
+        updated_log_recvd = True
+        if self.log:  # see if log from sender is equal or more up to date than ours
             logterm_ge_recvd = msg.last_log_term >= self._last_log_term
             log_ge_recvd = msg.last_log_index >= len(self.log)
-            # log term from message greater or equal to ours and it's more up to date
             updated_log_recvd = logterm_ge_recvd and log_ge_recvd
-        else:
-            # start case: if our logger and sender logger are empty, say yes
-            updated_log_recvd = True
 
         granted = can_vote_for_sender and updated_log_recvd and self.term <= msg.term
 
@@ -282,17 +276,16 @@ class State:
         if self.term <= msg.term:
             # 2. Reply false if log doesn’t contain an entry at after_log_index whose term
             # matches after_log_index_term (§5.3)
-            if not msg.after_log_index:
+            if not (after_i:= msg.after.index):
                 success = True
-            elif msg.after_log_index and msg.after_log_index in self.log:
-                if self.log[msg.after_log_index].term == msg.after_log_index_term:
+            elif after_i and after_i in self.log:
+                if self.log[after_i].term == msg.after.term:
                     success = True
         if success:  # we're good to attempt adding to our own log.
             # 3. If an existing entry conflicts with a new one (same index
             # but different terms), delete the existing entry and all that
             # follow it (§5.3)
-            success = self._append(msg.after_log_index, msg.after_log_index_term,
-                                   msg.entries)
+            success = self._append(msg.after, msg.entries)
 
         response = model.AppendEntriesReply(
             sender=control.peer_id,
@@ -311,7 +304,8 @@ class State:
             self.next_index[msg.sender] = msg.match_index + 1
         else:
             # backtrack until we have a match
-            logger.critical(f"Append entries failed for {msg.sender} at index {self.next_index[msg.sender]} from {msg.time}")
-            self.next_index[msg.sender] = max(self.next_index[msg.sender] - 1, 0)
+            logger.critical(f"Append entries failed for {msg.sender} at index {self.next_index[msg.sender]}: {msg}")
+            max_next_index = max(self.next_index[msg.sender] - 1, 0)
+            self.next_index[msg.sender] = min(max_next_index, msg.match_index)
             logger.critical(f"Back tracking and retrying now at {self.next_index[msg.sender]}")
             self._leader_append_entries_on_follower(msg.sender, control)

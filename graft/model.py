@@ -15,7 +15,6 @@ def validate_types(objects):
             raise TypeError(msg)
 
 
-# log internals
 @dataclass(frozen=True)
 class Index:
     """Log indices are composed of an `index` and `term` integers"""
@@ -38,7 +37,6 @@ class Entry:
     __post_init__ = _validate_from_annotations
 
 
-# messages
 @dataclass(frozen=True)
 class _BaseMessage:
     """Messages are frozen and include at least creation `time`, `sender` and `term`"""
@@ -51,8 +49,7 @@ class _BaseMessage:
 
 @dataclass(frozen=True)
 class AppendEntriesRequest(_BaseMessage):
-    after_log_index: int  # index of log entry immediately preceding new ones
-    after_log_index_term: int  # index' term entry after which entries will be appended
+    after: Index  # log index after which the entries should be added
     entries: tuple  # log entries to store (empty for heartbeat)
     leader_commit: int  # leader’s commit index
 
