@@ -22,13 +22,10 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
             >>> assert log[2].term == index.term  # index and term match existing entry
             >>> index = model.Index(0, term=4)  # will work since index it's origin
     """
-    model.validate_types(
-        dict(
-            {f'entry {i}': (entry, model.Entry) for i, entry in enumerate(entries)},
-            log=(log, immutables.Map),
-            after=(after, model.Index),
-        )
-    )
+    model.validate_types({
+        "log": (log, immutables.Map), "after": (after, model.Index),
+        **{f'entry {i}': (entry, model.Entry) for i, entry in enumerate(entries)},
+    })
     after_i = after.index
     # empty list of entries is ok
     new_entries = immutables.Map(
