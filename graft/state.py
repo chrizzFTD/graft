@@ -113,6 +113,7 @@ class State:
         if self.role != Roles.LEADER:
             return
         size = len(self.log)
+        self.commit_index = size
         next_follower_index = self.next_index[peer_id]
         # If last log index ≥ nextIndex for a follower: send
         # AppendEntries RPC with log entries starting at nextIndex
