@@ -8,6 +8,7 @@ the new leader. Leaders typically operate until they fail.
 import abc
 import math
 import logging
+import contextlib
 from enum import Enum, auto
 from dataclasses import dataclass
 
@@ -132,12 +133,10 @@ class State:
         control.send(peer_id, message)
 
     def _append(self, after, entries):
-        try:
+        with contextlib.suppress(log.AppendError):
             self.log = log.append(self.log, after, *entries)
-        except log.AppendError as exc:
-            logger.debug(exc)
-            return False
-        return True
+            return True
+        return False
 
     def timeout(self, control: BaseController):
         """If a follower receives no communication, it becomes a candidate and initiates an election.
@@ -235,7 +234,6 @@ class State:
         1. Reply false if term < currentTerm (§5.1)
         2. If votedFor is null or candidateId, and candidate’s log is at
         least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
-
 
             • If votes received from majority of servers: become leader
             • If AppendEntries RPC received from new leader: convert to
