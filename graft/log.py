@@ -3,10 +3,6 @@ from graft import model
 from functools import lru_cache
 
 
-class AppendError(ValueError):
-    pass
-
-
 def new():
     return immutables.Map()
 
@@ -65,3 +61,7 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
         mm.update(new_entries)
         log = mm.finish()
     return log
+
+
+class AppendError(ValueError):
+    """Raised by `append` when operation fails"""
