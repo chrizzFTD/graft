@@ -5,7 +5,7 @@ _integer = ((lambda x: x >= 0), "Expected zero or a positive integer. Got {0} in
 _zero_or_positive = dict(validators=(_integer,))
 
 
-def _validate_from_annotations(instance):
+def _validate_dataclass(instance):
     for fld in fields(instance):
         value = getattr(instance, fld.name)
         _validate_type(fld.name, value, fld.type)
@@ -32,7 +32,7 @@ class Index:
     index: int = field(metadata=_zero_or_positive)
     term: int = field(metadata=_zero_or_positive)
 
-    __post_init__ = _validate_from_annotations
+    __post_init__ = _validate_dataclass
 
 
 @dataclass(frozen=True)
@@ -41,7 +41,7 @@ class Entry:
     term: int = field(metadata=_zero_or_positive)
     item: object
 
-    __post_init__ = _validate_from_annotations
+    __post_init__ = _validate_dataclass
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ class _BaseMessage:
     sender: int  # peer that has sent the message
     term: int = field(metadata=_zero_or_positive)
 
-    __post_init__ = _validate_from_annotations
+    __post_init__ = _validate_dataclass
 
 
 @dataclass(frozen=True)
