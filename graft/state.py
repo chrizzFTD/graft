@@ -165,11 +165,11 @@ class State:
             self.votes_received_from = {candidate}  # Set of votes received
             # index of highest log entry applied to state machine
             last_applied = len(self.log)
+            last_applied_term = self.log[last_applied].term if self.log else 0
             msg = model.VoteRequest(
                 sender=candidate,
                 term=self.term,
-                last_log_index=last_applied,
-                last_log_term=self.log[last_applied].term if self.log else 0,
+                last_log_index=model.Index(last_applied, last_applied_term),
             )
             logger.debug(f"Requesting vote {msg}")
             # Send RequestVote RPCs to all other servers
@@ -212,8 +212,8 @@ class State:
 
         updated_log_recvd = True
         if self.log:  # see if log from sender is equal or more up to date than ours
-            logterm_ge_recvd = msg.last_log_term >= self._last_log_term
-            log_ge_recvd = msg.last_log_index >= len(self.log)
+            logterm_ge_recvd = msg.last_log_index.term >= self._last_log_term
+            log_ge_recvd = msg.last_log_index.index >= len(self.log)
             updated_log_recvd = logterm_ge_recvd and log_ge_recvd
 
         granted = can_vote_for_sender and updated_log_recvd and self.term <= msg.term
@@ -304,8 +304,8 @@ class State:
             self.next_index[msg.sender] = msg.match_index + 1
         else:
             # backtrack until we have a match
-            logger.critical(f"Append entries failed for {msg.sender} at index {self.next_index[msg.sender]}: {msg}")
+            logger.error(f"Append entries failed for {msg.sender} at index {self.next_index[msg.sender]}: {msg}")
             max_next_index = max(self.next_index[msg.sender] - 1, 0)
             self.next_index[msg.sender] = min(max_next_index, msg.match_index)
-            logger.critical(f"Back tracking and retrying now at {self.next_index[msg.sender]}")
+            logger.error(f"Back tracking and retrying now at {self.next_index[msg.sender]}")
             self._leader_append_entries_on_follower(msg.sender, control)

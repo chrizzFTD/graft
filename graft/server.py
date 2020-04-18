@@ -38,9 +38,10 @@ class Server(state.BaseController):
         )
 
     async def _start_timer(self):
+        timer = partial(state.State.timeout, self._state, self)
         while timeout:= randrange(_MIN_TIMEOUT*100, _MAX_TIMEOUT*100) / 100:
             await asyncio.sleep(timeout)
-            await self._add_event(partial(state.State.timeout, self._state, self))
+            await self._add_event(timer)
 
     async def _dispatch_messages(self):
         while msg:= await self._net.recv():
@@ -66,8 +67,9 @@ class Server(state.BaseController):
 
     async def _hearbeat(self):
         """Leader sends empty requests regularly to prevent election timeouts"""
+        heartbeat = partial(state.State.heartbeat, self._state, self)
         while await asyncio.sleep(self.peer_id/10, result=True):
-            await self._add_event(partial(state.State.heartbeat, self._state, self))
+            await self._add_event(heartbeat)
 
 
 if __name__ == '__main__':
@@ -107,7 +109,7 @@ if __name__ == '__main__':
     async def test(peer_id):
         server = Server(peer_id)
         asyncio.create_task(server.start())
-        while await asyncio.sleep(.5, result=True):
+        while await asyncio.sleep(peer_id, result=True):
             if server._state.role == state.Roles.LEADER:
                 msg = datetime.now()
                 server._state.append(server, msg)
