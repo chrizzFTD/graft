@@ -262,29 +262,13 @@ class State:
         self.heard_leader = True
         self._handle_base_message(msg)
 
-        success = False
-        if self.role == Roles.CANDIDATE and self.term == msg.term:
-            # If the leader’s term (included in its RPC) is at least as large as the
-            # candidate’s current term, then the candidate recognizes the leader
-            # as legitimate and returns to follower state.
-            self.become_follower()
-
-        # 1. Reply false if term < currentTerm (§5.1)
-        # If the term in the RPC is smaller than the candidate’s current term,
-        # then the candidate rejects the RPC and continues in candidate state.
         if self.term <= msg.term:
-            # 2. Reply false if log doesn’t contain an entry at after_log_index whose term
-            # matches after_log_index_term (§5.3)
-            if not (after_i:= msg.after.index):
-                success = True
-            elif after_i and after_i in self.log:
-                if self.log[after_i].term == msg.after.term:
-                    success = True
-        if success:  # we're good to attempt adding to our own log.
-            # 3. If an existing entry conflicts with a new one (same index
-            # but different terms), delete the existing entry and all that
-            # follow it (§5.3)
+            # If message term is greater or equal as ours, recognize sender as leader
+            if self.role == Roles.CANDIDATE:
+                self.become_follower()
             success = self._append(msg.after, msg.entries)
+        else:  # Our term is stronger than the message one. We must be more up to date.
+            success = False
 
         response = model.AppendEntriesReply(
             sender=control.peer_id,
