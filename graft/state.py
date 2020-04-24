@@ -105,7 +105,7 @@ class State:
             return
         after_index = len(self.log)
         after_term = self.log[after_index].term if after_index else self.term
-        self.log = log.append(self.log, model.Index(after_index, after_term), *entries)
+        self.log = log.append(self.log, model.Index(after_term, after_index), *entries)
         for follower in control.peers:
             self._leader_append_entries_on_follower(follower, control)
 
@@ -127,7 +127,7 @@ class State:
         message = model.AppendEntriesRequest(
             term=self.term,  # leader’s term
             sender=control.peer_id,  # so follower can redirect clients
-            after=model.Index(after_i, after_t),
+            after=model.Index(after_t, after_i),
             entries=tuple(new_entries),
             leader_commit=self.commit_index,
         )
@@ -169,7 +169,7 @@ class State:
             msg = model.VoteRequest(
                 sender=candidate,
                 term=self.term,
-                last_log_index=model.Index(last_applied, last_applied_term),
+                last_log_index=model.Index(last_applied_term, last_applied),
             )
             logger.debug(f"Requesting vote {msg}")
             # Send RequestVote RPCs to all other servers
@@ -213,7 +213,7 @@ class State:
         updated_log_recvd = True
         if self.log:  # see if log from sender is equal or more up to date than ours
             logterm_ge_recvd = msg.last_log_index.term >= self._last_log_term
-            log_ge_recvd = msg.last_log_index.index >= len(self.log)
+            log_ge_recvd = msg.last_log_index.key >= len(self.log)
             updated_log_recvd = logterm_ge_recvd and log_ge_recvd
 
         granted = can_vote_for_sender and updated_log_recvd and self.term <= msg.term

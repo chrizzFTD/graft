@@ -103,7 +103,7 @@ if __name__ == '__main__':
         size = len(server._state.log)
         logger.info(f"{server.peer_id}, {server._state.role} term: {server._state.term}, {size=}")
         if size:
-            for i in sorted(filter(lambda x: x>0, {1, size-1, size})):
+            for i in sorted(filter(lambda x: x > 0, {1, size-1, size})):
                 logger.debug(f"Index {i}: {server._state.log[i]}")
 
     async def test(peer_id):

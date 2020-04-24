@@ -26,11 +26,11 @@ def validate_types(objects):
         _validate_type(name, value, expected)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class Index:
     """Log indices are composed of an `index` and `term` integers"""
-    index: int = field(metadata=_zero_or_positive)
     term: int = field(metadata=_zero_or_positive)
+    key: int = field(metadata=_zero_or_positive)
 
     __post_init__ = _validate_dataclass
 
