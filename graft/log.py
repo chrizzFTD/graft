@@ -24,11 +24,6 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
         **{f'entry {i}': (entry, model.Entry) for i, entry in enumerate(entries)},
     })
     key = after.key
-    # empty list of entries is ok
-    new_entries = immutables.Map(
-        {key + i: entry for i, entry in enumerate(entries, start=1)}
-    )
-
     # No gap is there between requested `after` index and size of current logger.
     try:
         after_own_entry = log[key]
@@ -43,6 +38,9 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
             msg = f"Index {key=} exists but terms are not equal. {requested=}, {actual=}"
             raise AppendError(msg)
 
+    new_entries = immutables.Map(
+        {key + i: entry for i, entry in enumerate(entries, start=1)}
+    )
     max_key = max(log, default=0)
     to_delete = set(range(key + 1, max_key + 1))
     if missing:= to_delete.difference(log):
@@ -57,7 +55,6 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
 
     with log.mutate() as mm:
         for i in to_delete:
-            # If you get KeyError, go here: https://github.com/MagicStack/immutables/issues/24
             del mm[i]
         mm.update(new_entries)
         log = mm.finish()
