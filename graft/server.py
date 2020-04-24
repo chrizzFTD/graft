@@ -5,7 +5,7 @@ from random import randrange
 from types import MappingProxyType
 from functools import partial, cached_property
 
-from graft import net, state, model
+from . import net, state, model
 
 logger = logging.getLogger(__name__)
 

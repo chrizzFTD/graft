@@ -5,7 +5,7 @@ import contextlib
 from types import MappingProxyType
 from functools import cached_property
 
-from graft import config, transport
+from . import config, transport
 
 
 logger = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ import contextlib
 from enum import Enum, auto
 from dataclasses import dataclass
 
-from graft import log, model
+from . import log, model
 
 logger = logging.getLogger(__name__)
 

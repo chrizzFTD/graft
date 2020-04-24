@@ -1,7 +1,7 @@
 import immutables
 from functools import lru_cache
 
-from graft import model
+from . import model
 
 
 def new():
