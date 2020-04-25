@@ -4,17 +4,18 @@ from functools import lru_cache
 from . import model
 
 
-def new():
+def new() -> immutables.Map:
+    """Create a new, empty log."""
     return immutables.Map()
 
 
 @lru_cache(maxsize=1)  # idempotent: calling with same arguments has same result
 def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> immutables.Map:
-    """Append the given logger entries to the current logger *after* the given index.
+    """Append the given entries to `log` *after* the given :class:`graft.model.Index`.
 
-    :raises AppendError: If the operation is unsuccessful. Which can happen if the
-        requested `after` index does not exist in the given `log` (including it's term).
-        Unless index.key is 0 (the origin). For example:
+    :raises AppendError: If the operation is unsuccessful, which can happen if `after`
+        index does not exist in the given `log`. Unless index.key is 0 (the origin).
+        For example:
             >>> index = model.Index(key=2, term=4)
             >>> assert log[2].term == index.term  # index and term match existing entry
             >>> index = model.Index(key=0, term=4)  # will work since index it's origin
@@ -63,4 +64,4 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
 
 
 class AppendError(ValueError):
-    """Raised by `append` when operation fails"""
+    """Raised by :func:`append` when an invalid :class:`graft.model.Index` is passed"""
