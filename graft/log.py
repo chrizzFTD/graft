@@ -19,10 +19,13 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
             >>> assert log[2].term == index.term  # index and term match existing entry
             >>> index = model.Index(key=0, term=4)  # will work since index it's origin
     """
-    model.validate_types({
-        "log": (log, immutables.Map), "after": (after, model.Index),
-        **{f'entry {i}': (e, model.Entry) for i, e in enumerate(entries)},
-    })
+    for name, object, expected in (
+            ("log", log, immutables.Map), ("after", after, model.Index),
+            *((f'entry {i}', e, model.Entry) for i, e in enumerate(entries))):
+        if not isinstance(object, expected):
+            msg = (f"Expected '{name}' to be of type: '{expected}'. "
+                   f"Got: '{type(object).__name__}' instead.")
+            raise TypeError(msg)
     key = after.key
     # No gap is there between requested `after` index and size of current logger.
     try:

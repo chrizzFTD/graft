@@ -21,11 +21,6 @@ def _validate_type(name, value, expected):
         raise TypeError(msg)
 
 
-def validate_types(objects):
-    for name, (value, expected) in objects.items():
-        _validate_type(name, value, expected)
-
-
 @dataclass(frozen=True, order=True)
 class Index:
     """Log indices are composed of an `index` and `term` integers"""
