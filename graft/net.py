@@ -5,7 +5,7 @@ import contextlib
 from types import MappingProxyType
 from functools import cached_property
 
-from graft import config, transport
+from . import config, transport
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class Network:
         logger.warning(f"Broken peer {connected_peer}. Closing connection and clearing queue.")
         writer.close()
         await writer.wait_closed()
-        ## remove all that was going to be sent
+        # remove all that was going to be sent
         peer_q = self.outbox[connected_peer]
         while peer_q.qsize():
             peer_q.get_nowait()

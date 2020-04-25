@@ -8,10 +8,11 @@ the new leader. Leaders typically operate until they fail.
 import abc
 import math
 import logging
+import contextlib
 from enum import Enum, auto
 from dataclasses import dataclass
 
-from graft import log, model
+from . import log, model
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class State:
             return
         after_index = len(self.log)
         after_term = self.log[after_index].term if after_index else self.term
-        self.log = log.append(self.log, model.Index(after_index, after_term), *entries)
+        self.log = log.append(self.log, model.Index(after_term, after_index), *entries)
         for follower in control.peers:
             self._leader_append_entries_on_follower(follower, control)
 
@@ -112,6 +113,7 @@ class State:
         if self.role != Roles.LEADER:
             return
         size = len(self.log)
+        self.commit_index = size
         next_follower_index = self.next_index[peer_id]
         # If last log index ≥ nextIndex for a follower: send
         # AppendEntries RPC with log entries starting at nextIndex
@@ -120,28 +122,22 @@ class State:
             new_entries = (self.log[i] for i in range(start_range, size+1))
         else:
             new_entries = tuple()
-        if size:
-            after_log_index = max(next_follower_index - 1, 0)
-        else:
-            after_log_index = 0
+        after_i = max(next_follower_index - 1, 0) if size else 0
+        after_t = self.log[after_i].term if after_i else self.term
         message = model.AppendEntriesRequest(
             term=self.term,  # leader’s term
             sender=control.peer_id,  # so follower can redirect clients
-            after_log_index=after_log_index,
-            after_log_index_term=self.log[after_log_index].term if after_log_index else self.term,
+            after=model.Index(after_t, after_i),
             entries=tuple(new_entries),
             leader_commit=self.commit_index,
         )
         control.send(peer_id, message)
 
-    def _append(self, after_index, after_term, entries):
-        index = model.Index(after_index, after_term)
-        try:
-            self.log = log.append(self.log, index, *entries)
-        except log.AppendError as exc:
-            logger.debug(exc)
-            return False
-        return True
+    def _append(self, after, entries):
+        with contextlib.suppress(log.AppendError):
+            self.log = log.append(self.log, after, *entries)
+            return True
+        return False
 
     def timeout(self, control: BaseController):
         """If a follower receives no communication, it becomes a candidate and initiates an election.
@@ -169,11 +165,11 @@ class State:
             self.votes_received_from = {candidate}  # Set of votes received
             # index of highest log entry applied to state machine
             last_applied = len(self.log)
+            last_applied_term = self.log[last_applied].term if self.log else 0
             msg = model.VoteRequest(
                 sender=candidate,
                 term=self.term,
-                last_log_index=last_applied,
-                last_log_term=self.log[last_applied].term if self.log else 0,
+                last_log_index=model.Index(last_applied_term, last_applied),
             )
             logger.debug(f"Requesting vote {msg}")
             # Send RequestVote RPCs to all other servers
@@ -201,7 +197,7 @@ class State:
         """
         if message.term > self.term:
             self.term = message.term
-            logger.debug("Becoming followe from _handle_base_message")
+            logger.debug("Becoming follower from _handle_base_message")
             self.become_follower()
 
     def on_election_request(self, control: BaseController, msg: model.VoteRequest):
@@ -213,14 +209,12 @@ class State:
         self._handle_base_message(msg)
         # Make sure we've only voted once (or already voted for the sender)
         can_vote_for_sender = not self.voted_for or self.voted_for == msg.sender
-        if self.log or msg.last_log_index:
-            logterm_ge_recvd = msg.last_log_term >= self._last_log_term
-            log_ge_recvd = msg.last_log_index >= len(self.log)
-            # log term from message greater or equal to ours and it's more up to date
+
+        updated_log_recvd = True
+        if self.log:  # see if log from sender is equal or more up to date than ours
+            logterm_ge_recvd = msg.last_log_index.term >= self._last_log_term
+            log_ge_recvd = msg.last_log_index.key >= len(self.log)
             updated_log_recvd = logterm_ge_recvd and log_ge_recvd
-        else:
-            # start case: if our logger and sender logger are empty, say yes
-            updated_log_recvd = True
 
         granted = can_vote_for_sender and updated_log_recvd and self.term <= msg.term
 
@@ -241,7 +235,6 @@ class State:
         1. Reply false if term < currentTerm (§5.1)
         2. If votedFor is null or candidateId, and candidate’s log is at
         least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
-
 
             • If votes received from majority of servers: become leader
             • If AppendEntries RPC received from new leader: convert to
@@ -269,30 +262,13 @@ class State:
         self.heard_leader = True
         self._handle_base_message(msg)
 
-        success = False
-        if self.role == Roles.CANDIDATE and self.term == msg.term:
-            # If the leader’s term (included in its RPC) is at least as large as the
-            # candidate’s current term, then the candidate recognizes the leader
-            # as legitimate and returns to follower state.
-            self.become_follower()
-
-        # 1. Reply false if term < currentTerm (§5.1)
-        # If the term in the RPC is smaller than the candidate’s current term,
-        # then the candidate rejects the RPC and continues in candidate state.
         if self.term <= msg.term:
-            # 2. Reply false if log doesn’t contain an entry at after_log_index whose term
-            # matches after_log_index_term (§5.3)
-            if not msg.after_log_index:
-                success = True
-            elif msg.after_log_index and msg.after_log_index in self.log:
-                if self.log[msg.after_log_index].term == msg.after_log_index_term:
-                    success = True
-        if success:  # we're good to attempt adding to our own log.
-            # 3. If an existing entry conflicts with a new one (same index
-            # but different terms), delete the existing entry and all that
-            # follow it (§5.3)
-            success = self._append(msg.after_log_index, msg.after_log_index_term,
-                                   msg.entries)
+            # If message term is greater or equal as ours, recognize sender as leader
+            if self.role == Roles.CANDIDATE:
+                self.become_follower()
+            success = self._append(msg.after, msg.entries)
+        else:  # Our term is stronger than the message one. We must be more up to date.
+            success = False
 
         response = model.AppendEntriesReply(
             sender=control.peer_id,
@@ -311,7 +287,8 @@ class State:
             self.next_index[msg.sender] = msg.match_index + 1
         else:
             # backtrack until we have a match
-            logger.critical(f"Append entries failed for {msg.sender} at index {self.next_index[msg.sender]} from {msg.time}")
-            self.next_index[msg.sender] = max(self.next_index[msg.sender] - 1, 0)
-            logger.critical(f"Back tracking and retrying now at {self.next_index[msg.sender]}")
+            logger.error(f"Append entries failed for {msg.sender} at index {self.next_index[msg.sender]}: {msg}")
+            max_next_index = max(self.next_index[msg.sender] - 1, 0)
+            self.next_index[msg.sender] = min(max_next_index, msg.match_index)
+            logger.error(f"Back tracking and retrying now at {self.next_index[msg.sender]}")
             self._leader_append_entries_on_follower(msg.sender, control)

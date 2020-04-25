@@ -1,11 +1,15 @@
+[![Build Status](https://travis-ci.org/chrizzFTD/graft.svg?branch=master)](https://travis-ci.org/chrizzFTD/graft)
+[![Coverage Status](https://coveralls.io/repos/github/chrizzFTD/graft/badge.svg)](https://coveralls.io/github/chrizzFTD/graft)
+[![PyPI version](https://badge.fury.io/py/graft.svg)](https://badge.fury.io/py/graft)
+[![PyPI](https://img.shields.io/pypi/pyversions/graft.svg)](https://pypi.python.org/pypi/graft)
+
 # graft
 *A bit like raft.*
 
 This is an experiment of learning asyncio and [the raft algorithm.](https://raft.github.io/)
 
-Current dependency is [`immutables`](https://github.com/MagicStack/immutables)
 ```bash
-pip install immutables
+pip install graft
 ```
 ### Warning
 If you find this, expect a lot of changes, still unsure about its future.
@@ -17,15 +21,15 @@ For now:
 - 5 servers can start in your local host based on [the config file.](graft/config.py)
 - After launching each server (on separate shells), they'll start as followers.
 ```bash
-$ python graft/server.py 1
+$ python -m graft.server 1
 INFO Serving on ('127.0.0.1', 15000)
 INFO 1, Roles.FOLLOWER term: 0, size=0
 ```
 ```bash
-$ python graft/server.py 2
+$ python -m graft.server 2
 ```
 ```bash
-$ python graft/server.py 3
+$ python -m graft.server 3
 ```
 - If they don't hear from a leader after a timeout, a nomination will happen.
 ```bash
@@ -49,4 +53,4 @@ INFO 1, Roles.LEADER term: 1, size=4
     - If the leader dies, after a bit followers will call an election and cycle will start again.
 
 ### TODO:
-Everything else.
+Commit and everything else.
