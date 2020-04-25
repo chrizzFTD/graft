@@ -1,0 +1,7 @@
+[run]
+source=graft
+[report]
+omit =
+    */site-packages/*
+    setup.py
+    *tests/*
