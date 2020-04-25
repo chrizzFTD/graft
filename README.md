@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/chrizzFTD/graft.svg?branch=master)](https://travis-ci.org/chrizzFTD/graft)
 [![Coverage Status](https://coveralls.io/repos/github/chrizzFTD/graft/badge.svg)](https://coveralls.io/github/chrizzFTD/graft)
+[![Documentation Status](https://readthedocs.org/projects/graft/badge/?version=latest)](https://graft.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/graft.svg)](https://badge.fury.io/py/graft)
 [![PyPI](https://img.shields.io/pypi/pyversions/graft.svg)](https://pypi.python.org/pypi/graft)
 
