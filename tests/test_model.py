@@ -1,7 +1,7 @@
 import unittest
 import dataclasses
 
-from . import model
+from graft import model
 
 
 class TestIndex(unittest.TestCase):
