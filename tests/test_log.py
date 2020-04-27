@@ -9,6 +9,27 @@ class TestLog(unittest.TestCase):
         entries = (model.Entry(i, i) for i in range(1, 10))
         self.log_with_9 = log.append(populated, model.Index(0, 0), *entries)
 
+    def test_invalid_arguments(self):
+        with self.assertRaises(TypeError):
+            log.append(1, model.Index(1,2))
+
+        with self.assertRaises(TypeError):
+            log.append(log.new(), 2)
+
+        with self.assertRaises(TypeError):
+            log.append(log.new(), model.Index(0, 0), "hello")
+
+    def test_log_with_gap(self):
+        broken = immutables.Map({
+            1: model.Entry(1, "hello"),
+            3: model.Entry(1, 1),
+        })
+        result = log.append(broken, model.Index(1, 1), model.Entry(1, "world"))
+        self.assertEqual(result, immutables.Map({
+            1: model.Entry(1, "hello"),
+            2: model.Entry(1, "world"),
+        }))
+
     def test_missing_after_index(self):
         """(a) False. Missing entry at index 10. (b) False. Many missing entries."""
         with self.assertRaises(log.AppendError):

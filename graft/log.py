@@ -45,18 +45,15 @@ def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> im
             msg = f"Index {key=} exists but terms are not equal. {requested=}, {actual=}"
             raise AppendError(msg)
 
-    max_key = max(log, default=0)
-    to_delete = set(range(key + 1, max_key + 1))
-    if missing:= to_delete.difference(log):
-        msg = f"Missing keys from logger: {missing=}. Existing: {sorted(log)}"
-        raise AppendError(msg)
-
     new_entries = immutables.Map({key + i: e for i, e in enumerate(entries, start=1)})
     if set(new_entries) == set(log) or (not log) or (1 in new_entries):
         # if the keys of `new_entries` is exactly the same as the keys on `logger`,
         # return that already. Do the same if original logger is empty.
         # finally, if the index that we need to replace is 1, use new_entries instead
         return new_entries
+
+    max_key = max(log, default=0)
+    to_delete = set(range(key + 1, max_key + 1)).intersection(log)
 
     with log.mutate() as mm:
         for i in to_delete:
