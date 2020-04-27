@@ -11,7 +11,10 @@ def new() -> immutables.Map:
 
 @lru_cache(maxsize=1)  # idempotent: calling with same arguments has same result
 def append(log: immutables.Map, after: model.Index, *entries: model.Entry) -> immutables.Map:
-    """Append the given entries to `log` *after* the given :class:`graft.model.Index`.
+    """Append the given entries to `log` *after* the given index.
+
+    :param log: Log object to append entries to.
+    :param after: Log index after which entries will be appended.
 
     :raises AppendError: If the operation is unsuccessful, which can happen if `after`
         index does not exist in the given `log`. Unless index.key is 0 (the origin).
