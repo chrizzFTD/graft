@@ -92,6 +92,20 @@ class TestState(unittest.TestCase):
         lead.timeout(self.ctrl1)
         self.assertEqual(lead.role, state.Roles.LEADER)
 
+    def test_become_leader(self):
+        """Verify becoming leader does sets required state"""
+        lead = self.state1
+        self.assertEqual(lead.role, state.Roles.FOLLOWER)
+        lead.votes_received_from.update(self.ctrl1.peers)
+        lead.become_leader(self.ctrl1)
+        # votes received should be cleared
+        self.assertFalse(lead.votes_received_from)
+        # becoming leader should have sent a message
+        for msg in self.ctrl1.messages.values():
+            self.assertIsInstance(msg, model.AppendEntriesRequest)
+        self.assertEqual(len(self.ctrl1.peers), len(self.ctrl1.messages))
+        self.assertEqual(lead.role, state.Roles.LEADER)
+
     def test_candidate_append_request(self):
         """While waiting for votes, a candidate may receive an AppendEntries RPC from
         another server claiming to be leader.

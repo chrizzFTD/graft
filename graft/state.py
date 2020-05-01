@@ -39,10 +39,14 @@ class BaseController(abc.ABC):
     @property
     @abc.abstractmethod
     def peers(self) -> set:
-        pass
+        """Peer ids in the raft network"""
 
     @abc.abstractmethod
     def send(self, target_peer: int, message: object):
+        """Send a message to a target peer.
+
+        :raises TargetIsSenderError: If `target_peer` is `self.peer_id`
+        """
         if target_peer == self.peer_id:
             msg = f"Can't send {message=} to ourselves: {self.peer_id}, {target_peer=}"
             raise TargetIsSenderError(msg)
