@@ -92,6 +92,15 @@ class TestState(unittest.TestCase):
         lead.timeout(self.ctrl1)
         self.assertEqual(lead.role, state.Roles.LEADER)
 
+    def test_follower_cant_append(self):
+        """Verify a follower can not append entries to a log"""
+        follower = self.state1
+        follower.append(self.ctrl1, "hello")
+        self.assertEqual(follower.role, state.Roles.FOLLOWER)
+        self.assertEqual(0, len(self.ctrl1.messages))
+        follower._leader_append_entries_on_follower(2, self.ctrl1)
+        self.assertEqual(0, len(self.ctrl1.messages))
+
     def test_become_leader(self):
         """Verify becoming leader does sets required state"""
         lead = self.state1
@@ -112,10 +121,34 @@ class TestState(unittest.TestCase):
 
         If the leader’s term (included in its RPC) is at least as large as the
         candidate’s current term, then the candidate recognizes the leader as legitimate
-        and returns to followerstate.
+        and returns to follower state.
 
         :return:
         """
+        candidate = self.state1
+        candidate.term = 2
+        self.assertEqual(candidate.role, state.Roles.FOLLOWER)
+        candidate.role = state.Roles.CANDIDATE
+        request = model.AppendEntriesRequest(
+            term=candidate.term-1,
+            sender=self.ctrl1.peer_id+1,  # so follower can redirect clients
+            after=model.Index(term=candidate.term+1, key=0),
+            entries=tuple(),
+            leader_commit=1,
+        )
+        candidate.on_append_entries_request(self.ctrl1, request)
+        # request with lower term should not change state
+        self.assertEqual(candidate.role, state.Roles.CANDIDATE)
+        # request with lower term should change state
+        request = model.AppendEntriesRequest(
+            term=candidate.term + 1,
+            sender=self.ctrl1.peer_id + 1,  # so follower can redirect clients
+            after=model.Index(term=candidate.term + 1, key=0),
+            entries=tuple(),
+            leader_commit=1,
+        )
+        candidate.on_append_entries_request(self.ctrl1, request)
+        self.assertEqual(candidate.role, state.Roles.FOLLOWER)
 
 
 if __name__ == '__main__':
